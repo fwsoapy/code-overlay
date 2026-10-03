@@ -10,4 +10,4 @@ Open `index.html` or turn on GitHub Pages for this repo (Settings > Pages > Depl
 - Four presets plus your own saved ones
 - Download PNG at 1x to 8x, or copy it to the clipboard
 
-Uses Burbank Big Condensed Bold (House Industries), embedded in the page with permission.
+Uses Burbank Big Black (House Industries), embedded in the page with permission.
