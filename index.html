@@ -1,0 +1,1409 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Code Overlay - by fwsoapy</title>
+    <meta
+      name="description"
+      content="Make a custom 'Use Code' creator code overlay for your stream or videos and download it as a transparent PNG. Runs entirely in your browser."
+    />
+    <meta name="author" content="fwsoapy" />
+    <meta name="theme-color" content="#f4f6f9" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#10141a" media="(prefers-color-scheme: dark)" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo+Black&family=Bebas+Neue&family=Bungee&family=Lilita+One&family=Luckiest+Guy&family=Montserrat:wght@900&family=Oswald:wght@700&family=Poppins:wght@900&family=Rubik:wght@900&family=Russo+One&display=swap"
+    />
+
+    <script>
+      /* Applies a stored theme before first paint so the other palette never
+         flashes. The key matches THEME_KEY further down. */
+      try {
+        var t = localStorage.getItem('code-overlay:theme');
+        if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+      } catch (e) { /* storage blocked: fall back to following the OS */ }
+    </script>
+
+    <style>
+      /*
+       * Theming, lifted from SeedForge so the two sites look like siblings.
+       * Light applies when the OS asks for it and no explicit choice overrides
+       * it, or when the toggle picks it outright.
+       */
+      :root {
+        color-scheme: dark;
+
+        --bg: #10141a;
+        --bg-raised: #171d26;
+        --bg-input: #0d1116;
+        --line: #26303d;
+        --line-hover: #3a4757;
+        --text: #e6edf3;
+        --muted: #93a1b1;
+        --faint: #6f7c8b;
+        --accent: #5ac36a;
+        --accent-hover: #6ad57a;
+        --accent-dark: #3d8f4a;
+        --on-accent: #0c1710;
+        --selected-bg: #12241a;
+        --danger: #ef6461;
+        --checker-a: #1b222c;
+        --checker-b: #141a22;
+        --shadow: rgba(0, 0, 0, 0.5);
+      }
+
+      @media (prefers-color-scheme: light) {
+        :root:not([data-theme="dark"]) {
+          color-scheme: light;
+
+          --bg: #f4f6f9;
+          --bg-raised: #ffffff;
+          --bg-input: #f8fafc;
+          --line: #d6dde5;
+          --line-hover: #b3bfcc;
+          --text: #1b2430;
+          --muted: #5b6876;
+          --faint: #76828f;
+          --accent: #2f8f43;
+          --accent-hover: #27803a;
+          --accent-dark: #4aa85c;
+          --on-accent: #ffffff;
+          --selected-bg: #eaf6ed;
+          --danger: #c8332f;
+          --checker-a: #e7ebf0;
+          --checker-b: #f8fafc;
+          --shadow: rgba(27, 36, 48, 0.18);
+        }
+      }
+
+      :root[data-theme="light"] {
+        color-scheme: light;
+
+        --bg: #f4f6f9;
+        --bg-raised: #ffffff;
+        --bg-input: #f8fafc;
+        --line: #d6dde5;
+        --line-hover: #b3bfcc;
+        --text: #1b2430;
+        --muted: #5b6876;
+        --faint: #76828f;
+        --accent: #2f8f43;
+        --accent-hover: #27803a;
+        --accent-dark: #4aa85c;
+        --on-accent: #ffffff;
+        --selected-bg: #eaf6ed;
+        --danger: #c8332f;
+        --checker-a: #e7ebf0;
+        --checker-b: #f8fafc;
+        --shadow: rgba(27, 36, 48, 0.18);
+      }
+
+      :root[data-theme="dark"] { color-scheme: dark; }
+
+      :root {
+        --radius: 10px;
+        --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+
+      a { color: var(--accent); }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 18px 24px;
+        border-bottom: 1px solid var(--line);
+        background: var(--bg-raised);
+      }
+
+      .brand { display: flex; align-items: center; gap: 14px; }
+      .brand-mark { width: 56px; height: 56px; flex: none; display: block; image-rendering: pixelated; }
+      .topbar h1 { font-size: 20px; margin: 0; letter-spacing: 0.2px; }
+      .tagline { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+
+      .ghost-link {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 7px 12px;
+        text-decoration: none;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .ghost-link:hover { color: var(--text); border-color: var(--accent-dark); }
+
+      .topbar-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+
+      .icon-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        border: 1px solid var(--line);
+        background: transparent;
+        color: var(--muted);
+        border-radius: 8px;
+        padding: 6px 11px;
+        font-size: 13px;
+        line-height: 1.2;
+      }
+      .icon-btn:hover { color: var(--text); border-color: var(--accent-dark); }
+      .icon-btn span:first-child { font-size: 14px; }
+
+      main {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 24px 20px 60px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+
+      .panel {
+        background: var(--bg-raised);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 20px;
+      }
+      .panel h2 { margin: 0 0 4px; font-size: 16px; }
+
+      .row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 260px));
+        justify-content: start;
+        align-items: start;
+        gap: 16px 22px;
+      }
+
+      .field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
+      .field[hidden] { display: none; }
+
+      input, select {
+        background: var(--bg-input);
+        border: 1px solid var(--line);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 9px 10px;
+        font: inherit;
+        font-size: 14px;
+        width: 100%;
+      }
+      input:focus, select:focus { outline: 2px solid var(--accent-dark); outline-offset: 1px; }
+
+      .field-hint { font-size: 11px; color: var(--faint); line-height: 1.4; }
+
+      .section { margin-top: 26px; }
+      .section:first-of-type { margin-top: 0; }
+      .section-head {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 10px;
+      }
+      .section-head h2 { margin: 0; }
+      .hint { color: var(--muted); font-size: 13px; margin: 0; }
+
+      .group-heading {
+        margin: 0 0 7px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.7px;
+        text-transform: uppercase;
+        color: var(--faint);
+      }
+
+      /* --- colour + range inputs --------------------------------------- */
+
+      .color-input { display: flex; gap: 8px; }
+      .color-input input[type="color"] {
+        flex: none;
+        width: 42px;
+        height: 40px;
+        padding: 3px;
+        cursor: pointer;
+      }
+      .color-input input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+      .color-input input[type="color"]::-webkit-color-swatch { border: none; border-radius: 5px; }
+      .color-input input[type="color"]::-moz-color-swatch { border: none; border-radius: 5px; }
+      .color-input input[type="text"] { font-family: var(--mono); font-size: 13px; text-transform: lowercase; }
+
+      .range-head { display: flex; justify-content: space-between; gap: 8px; }
+      .range-val { font-family: var(--mono); font-size: 12px; color: var(--text); }
+      input[type="range"] {
+        padding: 0;
+        border: none;
+        background: transparent;
+        accent-color: var(--accent);
+        height: 26px;
+        cursor: pointer;
+      }
+      input[type="range"]:focus { outline: none; }
+      input[type="range"]:focus-visible { outline: 2px solid var(--accent-dark); outline-offset: 2px; }
+
+      /* --- presets (same tiles as SeedForge) --------------------------- */
+
+      .preset-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+        gap: 9px;
+      }
+
+      .preset {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        text-align: left;
+        padding: 11px 13px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: var(--bg-input);
+        color: var(--text);
+        font: inherit;
+      }
+      .preset:hover { border-color: var(--accent-dark); }
+      .preset.on { border-color: var(--accent-dark); background: var(--selected-bg); }
+      .preset-name { font-size: 13.5px; font-weight: 600; }
+      .preset-blurb { font-size: 11.5px; color: var(--muted); line-height: 1.45; }
+      .preset-swatch { display: block; height: 22px; border-radius: 5px; border: 1px solid var(--line); }
+
+      .preset-slot { position: relative; display: flex; }
+      .preset-slot .preset { flex: 1; }
+      .preset-slot:has(.preset-delete) .preset { padding-right: 32px; }
+
+      .preset-delete {
+        position: absolute;
+        top: 7px;
+        right: 7px;
+        border: none;
+        background: transparent;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1;
+        padding: 3px 5px;
+        border-radius: 5px;
+      }
+      .preset-delete:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+
+      .preset-save {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+      }
+      .preset-save input { width: auto; flex: 1 1 200px; max-width: 260px; }
+
+      /* Segmented choices, styled like SeedForge's preset options. */
+      .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+      .seg button {
+        border: 1px solid var(--line);
+        background: var(--bg-input);
+        color: var(--text);
+        border-radius: 7px;
+        padding: 7px 12px;
+        font-size: 13px;
+      }
+      .seg button:hover { border-color: var(--accent-dark); }
+      .seg button.on { border-color: var(--accent-dark); background: var(--selected-bg); }
+
+      /* --- checkboxes -------------------------------------------------- */
+
+      .check-line {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        color: var(--text);
+        font-size: 13.5px;
+        cursor: pointer;
+        padding: 3px 0;
+      }
+      .check-line input {
+        width: 16px;
+        height: 16px;
+        flex: none;
+        margin: 0;
+        accent-color: var(--accent);
+        cursor: pointer;
+      }
+      .field.check { justify-content: flex-end; min-height: 40px; }
+
+      /* --- preview ----------------------------------------------------- */
+
+      .stage {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 200px;
+        padding: 28px 16px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        overflow: hidden;
+        background-color: var(--checker-b);
+        background-image:
+          linear-gradient(45deg, var(--checker-a) 25%, transparent 25%),
+          linear-gradient(-45deg, var(--checker-a) 25%, transparent 25%),
+          linear-gradient(45deg, transparent 75%, var(--checker-a) 75%),
+          linear-gradient(-45deg, transparent 75%, var(--checker-a) 75%);
+        background-size: 20px 20px;
+        background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+      }
+      .stage.bg-game {
+        background: linear-gradient(160deg, #6fb6e8 0%, #9fd3f2 45%, #6cae4f 46%, #3f7d33 100%);
+      }
+      .stage.bg-dark { background: #0b0d10; }
+      .stage.bg-light { background: #ffffff; }
+      .stage.bg-green { background: #00b140; }
+
+      #preview { display: block; max-width: 100%; height: auto; }
+
+      .preview-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+      }
+      .preview-bar .seg { margin-right: auto; }
+      .size-note { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+      .actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 18px;
+        padding-top: 18px;
+        border-top: 1px solid var(--line);
+        flex-wrap: wrap;
+      }
+      .actions select { width: auto; }
+      .status { font-size: 13px; color: var(--accent); }
+
+      button {
+        font: inherit;
+        font-size: 14px;
+        border-radius: 8px;
+        padding: 10px 18px;
+        cursor: pointer;
+        border: 1px solid transparent;
+      }
+      button:disabled { opacity: 0.45; cursor: not-allowed; }
+      button.small { padding: 7px 13px; font-size: 13px; }
+      .primary { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+      .primary:hover:not(:disabled) { background: var(--accent-hover); }
+      .secondary { background: transparent; border-color: var(--line); color: var(--text); }
+      .secondary:hover { border-color: var(--accent-dark); }
+      .ghost { background: transparent; border-color: transparent; color: var(--muted); }
+      .ghost:hover { color: var(--text); }
+
+      .advanced { margin-top: 18px; }
+      .advanced summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+      .advanced .row { margin-top: 12px; }
+
+      .site-footer {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 0 20px 50px;
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+
+      /* --- narrow screens ---------------------------------------------- */
+
+      @media (max-width: 620px) {
+        .topbar { flex-wrap: wrap; gap: 12px; padding: 14px 16px; }
+        .brand { gap: 11px; }
+        .brand-mark { width: 40px; height: 40px; }
+        .topbar h1 { font-size: 18px; }
+        .tagline { font-size: 12px; }
+        .topbar-actions { width: 100%; }
+        .topbar-actions .ghost-link { margin-left: auto; }
+
+        main { padding: 16px 14px 44px; gap: 14px; }
+        .panel { padding: 15px; }
+        .site-footer { padding: 0 14px 40px; }
+
+        .row { grid-template-columns: 1fr; gap: 13px; }
+        .actions button { flex: 1 1 auto; }
+        .stage { min-height: 150px; padding: 20px 10px; }
+      }
+
+      /* iOS Safari zooms in on focused fields under 16px and never zooms back. */
+      @media (pointer: coarse) {
+        input, select, .color-input input[type="text"] { font-size: 16px; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <svg class="brand-mark" viewBox="0 0 14 14" aria-hidden="true" shape-rendering="crispEdges">
+          <defs>
+            <linearGradient id="mark-grad" x1="0" x2="1" y1="0" y2="0">
+              <stop offset="0" stop-color="#ee9a74" />
+              <stop offset="1" stop-color="#e780ae" />
+            </linearGradient>
+          </defs>
+          <rect x="1" y="4" width="12" height="6" fill="#26303d" />
+          <rect x="6" y="5" width="6" height="4" fill="url(#mark-grad)" />
+          <rect x="2" y="5" width="3" height="1" fill="#e6edf3" />
+          <rect x="2" y="7" width="3" height="1" fill="#e6edf3" />
+          <rect x="3" y="8" width="1" height="1" fill="#e58fa3" />
+          <rect x="7" y="6" width="4" height="2" fill="#10141a" />
+        </svg>
+        <div>
+          <h1>Code Overlay</h1>
+          <p class="tagline">Make a "Use Code" overlay and download it as a PNG.</p>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button id="theme" class="icon-btn" type="button" aria-label="Switch theme">
+          <span id="theme-icon" aria-hidden="true">◐</span>
+          <span id="theme-label">System</span>
+        </button>
+        <a class="ghost-link" href="https://github.com/fwsoapy/code-overlay" target="_blank" rel="noreferrer noopener">GitHub</a>
+      </div>
+    </header>
+
+    <main>
+      <!-- Preview + export -->
+      <section class="panel">
+        <div class="section-head">
+          <h2>Preview</h2>
+          <p class="hint">This is exactly what the PNG will look like. The checkerboard means see-through.</p>
+        </div>
+        <div id="stage" class="stage">
+          <canvas id="preview" aria-label="Overlay preview"></canvas>
+        </div>
+        <div class="preview-bar">
+          <div class="seg" id="stage-bg" role="group" aria-label="Preview background">
+            <button type="button" data-val="checker" class="on">Transparent</button>
+            <button type="button" data-val="game">Gameplay</button>
+            <button type="button" data-val="dark">Dark</button>
+            <button type="button" data-val="light">Light</button>
+            <button type="button" data-val="green">Green screen</button>
+          </div>
+          <span id="size-note" class="size-note"></span>
+        </div>
+
+        <div class="actions">
+          <button id="download" class="primary" type="button">Download PNG</button>
+          <button id="copy" class="secondary" type="button">Copy image</button>
+          <label class="field" style="flex-direction: row; align-items: center; gap: 8px">
+            <span>Export size</span>
+            <select id="export-scale">
+              <option value="1">1x</option>
+              <option value="2">2x</option>
+              <option value="4" selected>4x (sharp)</option>
+              <option value="8">8x (huge)</option>
+            </select>
+          </label>
+          <span id="status" class="status" role="status"></span>
+        </div>
+      </section>
+
+      <!-- Presets -->
+      <section class="panel">
+        <div class="section-head">
+          <h2>Presets</h2>
+          <p class="hint">Changes the look only. Your code and text stay put.</p>
+        </div>
+        <div id="presets" class="preset-grid"></div>
+
+        <div id="custom-wrap" class="section" style="margin-top: 18px">
+          <p class="group-heading">Your presets</p>
+          <div id="custom-presets" class="preset-grid"></div>
+        </div>
+
+        <div class="preset-save">
+          <input id="preset-name" type="text" placeholder="Name this look" maxlength="40" />
+          <button id="preset-save" class="secondary small" type="button">Save as preset</button>
+        </div>
+      </section>
+
+      <!-- Customize -->
+      <section class="panel">
+        <div class="section">
+          <div class="section-head">
+            <h2>Text</h2>
+            <p class="hint">What the overlay says.</p>
+          </div>
+          <div class="row">
+            <label class="field">
+              <span>Creator code</span>
+              <input data-key="code" type="text" maxlength="32" spellcheck="false" />
+            </label>
+            <label class="field">
+              <span>Label</span>
+              <input data-key="label" type="text" maxlength="32" />
+            </label>
+            <label class="field" data-show="showSub">
+              <span>Small text</span>
+              <input data-key="sub" type="text" maxlength="32" />
+            </label>
+            <div class="field check">
+              <label class="check-line"><input data-key="showSub" type="checkbox" /> Show small text (#AD)</label>
+              <label class="check-line"><input data-key="uppercase" type="checkbox" /> ALL CAPS</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <h2>Code box</h2>
+            <p class="hint">The coloured block your code sits in.</p>
+          </div>
+          <div class="row">
+            <div class="field check">
+              <label class="check-line"><input data-key="boxGradient" type="checkbox" /> Gradient</label>
+            </div>
+            <div class="field" data-show="boxGradient">
+              <span>Gradient start</span>
+              <div class="color-input" data-color="boxColor1"></div>
+            </div>
+            <div class="field" data-show="boxGradient">
+              <span>Gradient end</span>
+              <div class="color-input" data-color="boxColor2"></div>
+            </div>
+            <div class="field" data-show="boxGradient">
+              <div class="range-head"><span>Gradient angle</span><span class="range-val" data-out="gradAngle"></span></div>
+              <input data-key="gradAngle" type="range" min="0" max="360" step="5" />
+            </div>
+            <div class="field" data-hide="boxGradient">
+              <span>Box colour</span>
+              <div class="color-input" data-color="boxSolid"></div>
+            </div>
+            <div class="field">
+              <div class="range-head"><span>Box opacity</span><span class="range-val" data-out="boxOpacity"></span></div>
+              <input data-key="boxOpacity" type="range" min="0" max="100" step="1" />
+            </div>
+          </div>
+          <div class="row" style="margin-top: 16px">
+            <div class="field">
+              <span>Code text colour</span>
+              <div class="seg" data-seg="codeTextMode">
+                <button type="button" data-val="black">Black</button>
+                <button type="button" data-val="white">White</button>
+                <button type="button" data-val="custom">Custom</button>
+              </div>
+            </div>
+            <div class="field" data-show-val="codeTextMode=custom">
+              <span>Custom code colour</span>
+              <div class="color-input" data-color="codeColor"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <h2>Colours</h2>
+            <p class="hint">Label, small text and the backing.</p>
+          </div>
+          <div class="row">
+            <div class="field">
+              <span>"Use code" colour</span>
+              <div class="color-input" data-color="labelColor"></div>
+            </div>
+            <div class="field" data-show="showSub">
+              <span>#AD colour</span>
+              <div class="color-input" data-color="subColor"></div>
+            </div>
+            <div class="field">
+              <span>Background colour</span>
+              <div class="color-input" data-color="bgColor"></div>
+            </div>
+            <div class="field">
+              <div class="range-head"><span>Background opacity</span><span class="range-val" data-out="bgOpacity"></span></div>
+              <input data-key="bgOpacity" type="range" min="0" max="100" step="1" />
+              <span class="field-hint">0% is fully see-through, 100% is solid.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <h2>Fonts</h2>
+            <p class="hint">Fortnite's own font isn't free, but you can upload it if you have it.</p>
+          </div>
+          <div class="row">
+            <label class="field">
+              <span>Label font</span>
+              <select data-key="labelFont" class="font-select"></select>
+            </label>
+            <label class="field">
+              <span>Code font</span>
+              <select data-key="codeFont" class="font-select"></select>
+            </label>
+            <label class="field">
+              <span>Upload a font (.ttf, .otf, .woff)</span>
+              <input id="font-upload" type="file" accept=".ttf,.otf,.woff,.woff2" />
+              <span class="field-hint">Only lasts until you reload the page.</span>
+            </label>
+          </div>
+        </div>
+
+        <details class="advanced">
+          <summary>Layout and size</summary>
+          <div class="row">
+            <div class="field">
+              <div class="range-head"><span>Label size</span><span class="range-val" data-out="labelSize"></span></div>
+              <input data-key="labelSize" type="range" min="10" max="60" step="1" />
+            </div>
+            <div class="field" data-show="showSub">
+              <div class="range-head"><span>Small text size</span><span class="range-val" data-out="subSize"></span></div>
+              <input data-key="subSize" type="range" min="6" max="40" step="1" />
+            </div>
+            <div class="field">
+              <div class="range-head"><span>Code size</span><span class="range-val" data-out="codeSize"></span></div>
+              <input data-key="codeSize" type="range" min="12" max="90" step="1" />
+            </div>
+            <div class="field">
+              <div class="range-head"><span>Slant</span><span class="range-val" data-out="slant"></span></div>
+              <input data-key="slant" type="range" min="-20" max="20" step="1" />
+            </div>
+            <div class="field">
+              <div class="range-head"><span>Outer padding</span><span class="range-val" data-out="pad"></span></div>
+              <input data-key="pad" type="range" min="0" max="40" step="1" />
+            </div>
+            <div class="field">
+              <div class="range-head"><span>Box inset</span><span class="range-val" data-out="inset"></span></div>
+              <input data-key="inset" type="range" min="0" max="20" step="1" />
+            </div>
+            <div class="field">
+              <div class="range-head"><span>Gap</span><span class="range-val" data-out="gap"></span></div>
+              <input data-key="gap" type="range" min="0" max="40" step="1" />
+            </div>
+            <div class="field">
+              <div class="range-head"><span>Code padding</span><span class="range-val" data-out="codePadX"></span></div>
+              <input data-key="codePadX" type="range" min="0" max="50" step="1" />
+            </div>
+            <div class="field">
+              <div class="range-head"><span>Background corners</span><span class="range-val" data-out="bgRadius"></span></div>
+              <input data-key="bgRadius" type="range" min="0" max="40" step="1" />
+            </div>
+            <div class="field">
+              <div class="range-head"><span>Box corners</span><span class="range-val" data-out="boxRadius"></span></div>
+              <input data-key="boxRadius" type="range" min="0" max="40" step="1" />
+            </div>
+            <div class="field">
+              <span>Label alignment</span>
+              <div class="seg" data-seg="align">
+                <button type="button" data-val="left">Left</button>
+                <button type="button" data-val="center">Center</button>
+                <button type="button" data-val="right">Right</button>
+              </div>
+            </div>
+            <div class="field check">
+              <label class="check-line"><input data-key="swap" type="checkbox" /> Code box on the left</label>
+              <label class="check-line"><input data-key="shadow" type="checkbox" /> Text shadow</label>
+            </div>
+            <div class="field" data-show="shadow">
+              <span>Shadow colour</span>
+              <div class="color-input" data-color="shadowColor"></div>
+            </div>
+          </div>
+        </details>
+
+        <div class="actions">
+          <button id="reset" class="ghost small" type="button">Reset everything</button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      Runs entirely in your browser. Nothing you type is uploaded anywhere. By
+      <a href="https://github.com/fwsoapy" target="_blank" rel="noreferrer noopener">fwsoapy</a>.
+    </footer>
+
+    <script>
+      (function () {
+        'use strict';
+
+        /* ---------------------------------------------------------------
+         * Fonts. Each value is "Family|weight" so heavy-only families like
+         * Montserrat 900 draw at the weight Google actually served.
+         * ------------------------------------------------------------- */
+        var FONTS = [
+          ['Anton|400', 'Anton'],
+          ['Bebas Neue|400', 'Bebas Neue'],
+          ['Lilita One|400', 'Lilita One'],
+          ['Luckiest Guy|400', 'Luckiest Guy'],
+          ['Russo One|400', 'Russo One'],
+          ['Oswald|700', 'Oswald Bold'],
+          ['Bungee|400', 'Bungee'],
+          ['Archivo Black|400', 'Archivo Black'],
+          ['Rubik|900', 'Rubik Black'],
+          ['Montserrat|900', 'Montserrat Black'],
+          ['Poppins|900', 'Poppins Black'],
+          ['Impact|400', 'Impact (system)'],
+          ['Arial Black|400', 'Arial Black (system)'],
+        ];
+
+        /* The look a preset controls. Text content is kept separate so
+           switching presets never wipes someone's code. */
+        var DEFAULT_STYLE = {
+          labelColor: '#ffffff',
+          subColor: '#e58fa3',
+          bgColor: '#141414',
+          bgOpacity: 50,
+          bgRadius: 3,
+          boxGradient: true,
+          boxColor1: '#ee9a74',
+          boxColor2: '#e780ae',
+          boxSolid: '#ee9a74',
+          gradAngle: 90,
+          boxOpacity: 100,
+          boxRadius: 2,
+          codeTextMode: 'black',
+          codeColor: '#111111',
+          labelFont: 'Anton|400',
+          codeFont: 'Anton|400',
+          labelSize: 24,
+          subSize: 12,
+          codeSize: 40,
+          slant: 0,
+          pad: 10,
+          inset: 4,
+          gap: 10,
+          codePadX: 14,
+          align: 'center',
+          swap: false,
+          shadow: false,
+          shadowColor: '#000000',
+          uppercase: true,
+        };
+
+        var DEFAULT_TEXT = { code: 'N1TR0IL', label: 'USE CODE', sub: '#AD', showSub: true };
+
+        function preset(name, blurb, over) {
+          var style = Object.assign({}, DEFAULT_STYLE, over);
+          return { name: name, blurb: blurb, style: style };
+        }
+
+        var PRESETS = [
+          preset('Default', 'The classic one everyone uses. Peach to pink, black code, 50% backing.', {}),
+          preset('Ice', 'Cyan to blue with white code.', {
+            boxColor1: '#5ee7ff', boxColor2: '#3b6cff', codeTextMode: 'white', subColor: '#5ee7ff',
+          }),
+          preset('Gold', 'Yellow to orange, black code.', {
+            boxColor1: '#ffe259', boxColor2: '#ffa751', subColor: '#ffd36e',
+          }),
+          preset('Purple', 'Violet to pink, white code.', {
+            boxColor1: '#8e5cff', boxColor2: '#ff5fa2', codeTextMode: 'white', subColor: '#c49bff',
+          }),
+          preset('Toxic', 'Lime to green, black code.', {
+            boxColor1: '#d4ff3f', boxColor2: '#3fd17a', subColor: '#b9f24a',
+          }),
+          preset('Blood', 'Red to deep red, white code.', {
+            boxColor1: '#ff5252', boxColor2: '#a3122c', codeTextMode: 'white', subColor: '#ff7a7a',
+          }),
+          preset('Clean white', 'Solid white box, black code, darker backing.', {
+            boxGradient: false, boxSolid: '#ffffff', bgOpacity: 70, subColor: '#bfbfbf',
+          }),
+          preset('Blackout', 'Solid black box, white code, no backing.', {
+            boxGradient: false, boxSolid: '#111111', codeTextMode: 'white', bgOpacity: 0,
+            shadow: true, subColor: '#e58fa3',
+          }),
+          preset('SeedForge', 'Matches the SeedForge green.', {
+            boxColor1: '#6ad57a', boxColor2: '#3d8f4a', codeTextMode: 'custom', codeColor: '#0c1710',
+            bgColor: '#10141a', bgOpacity: 80, bgRadius: 8, boxRadius: 6, subColor: '#6ad57a',
+          }),
+        ];
+
+        /* ---------------------------------------------------------------
+         * Storage. Per-browser convenience only, so every access is guarded
+         * and the page works the same when storage is blocked.
+         * ------------------------------------------------------------- */
+        var STATE_KEY = 'code-overlay:state';
+        var PRESETS_KEY = 'code-overlay:presets';
+        var THEME_KEY = 'code-overlay:theme';
+
+        function readJSON(key, fallback) {
+          try {
+            var raw = localStorage.getItem(key);
+            return raw ? JSON.parse(raw) : fallback;
+          } catch (e) {
+            return fallback;
+          }
+        }
+        function writeJSON(key, value) {
+          try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* blocked */ }
+        }
+
+        var state = Object.assign({}, DEFAULT_STYLE, DEFAULT_TEXT, readJSON(STATE_KEY, {}));
+        var customPresets = readJSON(PRESETS_KEY, []);
+        if (!Array.isArray(customPresets)) customPresets = [];
+
+        /* ---------------------------------------------------------------
+         * Drawing. Everything goes through one canvas routine so the
+         * preview and the PNG can't drift apart.
+         * ------------------------------------------------------------- */
+        function fontSpec(value, size) {
+          var parts = String(value).split('|');
+          return (parts[1] || '400') + ' ' + size + 'px "' + parts[0] + '"';
+        }
+
+        function hexToRgba(hex, alpha) {
+          var h = String(hex).replace('#', '');
+          if (h.length === 3) h = h.replace(/./g, '$&$&');
+          var n = parseInt(h, 16) || 0;
+          return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + alpha + ')';
+        }
+
+        function roundRect(ctx, x, y, w, h, r) {
+          r = Math.max(0, Math.min(r, w / 2, h / 2));
+          ctx.beginPath();
+          ctx.moveTo(x + r, y);
+          ctx.arcTo(x + w, y, x + w, y + h, r);
+          ctx.arcTo(x + w, y + h, x, y + h, r);
+          ctx.arcTo(x, y + h, x, y, r);
+          ctx.arcTo(x, y, x + w, y, r);
+          ctx.closePath();
+        }
+
+        function measure(ctx, text, font) {
+          ctx.font = font;
+          var m = ctx.measureText(text || ' ');
+          return {
+            w: text ? m.width : 0,
+            asc: text ? m.actualBoundingBoxAscent : 0,
+            desc: text ? Math.max(0, m.actualBoundingBoxDescent) : 0,
+          };
+        }
+
+        function codeTextColor(s) {
+          if (s.codeTextMode === 'white') return '#ffffff';
+          if (s.codeTextMode === 'custom') return s.codeColor;
+          return '#000000';
+        }
+
+        /* Draws text sheared by the slant angle around its own baseline. */
+        function drawText(ctx, s, text, font, color, x, baseline, asc) {
+          var shear = Math.tan((s.slant * Math.PI) / 180);
+          ctx.save();
+          ctx.font = font;
+          ctx.fillStyle = color;
+          ctx.textBaseline = 'alphabetic';
+          if (s.shadow) {
+            ctx.shadowColor = hexToRgba(s.shadowColor, 0.75);
+            ctx.shadowBlur = 4;
+            ctx.shadowOffsetX = 1;
+            ctx.shadowOffsetY = 2;
+          }
+          // Shift left by half the lean so slanted text still looks centred.
+          ctx.transform(1, 0, -shear, 1, x - (asc * shear) / 2, baseline);
+          ctx.fillText(text, 0, 0);
+          ctx.restore();
+        }
+
+        function render(canvas, scale) {
+          var s = state;
+          var ctx = canvas.getContext('2d');
+          var caps = function (t) { return s.uppercase ? String(t).toUpperCase() : String(t); };
+          var label = caps(s.label);
+          var sub = s.showSub ? caps(s.sub) : '';
+          var code = caps(s.code);
+
+          var labelFont = fontSpec(s.labelFont, s.labelSize);
+          var subFont = fontSpec(s.labelFont, s.subSize);
+          var codeFont = fontSpec(s.codeFont, s.codeSize);
+
+          var shearAbs = Math.abs(Math.tan((s.slant * Math.PI) / 180));
+          var mL = measure(ctx, label, labelFont);
+          var mS = measure(ctx, sub, subFont);
+          var mC = measure(ctx, code, codeFont);
+          mL.w += mL.asc * shearAbs;
+          mS.w += mS.asc * shearAbs;
+          mC.w += mC.asc * shearAbs;
+
+          var lineGap = sub && label ? Math.round(s.labelSize * 0.16) : 0;
+          var blockH = mL.asc + mL.desc + lineGap + mS.asc + mS.desc;
+          var leftW = Math.max(mL.w, mS.w);
+          var codeH = mC.asc + mC.desc;
+          var codePadY = Math.round(s.codeSize * 0.22);
+
+          var H = Math.ceil(Math.max(blockH + s.pad * 2, codeH + codePadY * 2 + s.inset * 2, 1));
+          var boxW = Math.ceil(mC.w + s.codePadX * 2);
+          var hasLeft = leftW > 0;
+          var leftArea = hasLeft ? s.pad + leftW + s.gap : s.inset;
+          var W = Math.ceil(leftArea + boxW + s.inset);
+
+          canvas.width = Math.max(1, Math.round(W * scale));
+          canvas.height = Math.max(1, Math.round(H * scale));
+          ctx.setTransform(scale, 0, 0, scale, 0, 0);
+          ctx.clearRect(0, 0, W, H);
+
+          // Mirror the layout when the code box goes on the left.
+          var boxX = s.swap ? s.inset : leftArea;
+          var textX = s.swap ? s.inset + boxW + s.gap : s.pad;
+          var boxY = s.inset;
+          var boxH = H - s.inset * 2;
+
+          // Backing
+          if (s.bgOpacity > 0) {
+            roundRect(ctx, 0, 0, W, H, s.bgRadius);
+            ctx.fillStyle = hexToRgba(s.bgColor, s.bgOpacity / 100);
+            ctx.fill();
+          }
+
+          // Code box
+          if (s.boxOpacity > 0) {
+            ctx.save();
+            ctx.globalAlpha = s.boxOpacity / 100;
+            if (s.boxGradient) {
+              // Same convention as CSS: 0° runs bottom to top, 90° left to right.
+              var a = (s.gradAngle * Math.PI) / 180;
+              var dx = Math.sin(a);
+              var dy = -Math.cos(a);
+              var cx = boxX + boxW / 2;
+              var cy = boxY + boxH / 2;
+              var half = (Math.abs(boxW * dx) + Math.abs(boxH * dy)) / 2;
+              var g = ctx.createLinearGradient(cx - dx * half, cy - dy * half, cx + dx * half, cy + dy * half);
+              g.addColorStop(0, s.boxColor1);
+              g.addColorStop(1, s.boxColor2);
+              ctx.fillStyle = g;
+            } else {
+              ctx.fillStyle = s.boxSolid;
+            }
+            roundRect(ctx, boxX, boxY, boxW, boxH, s.boxRadius);
+            ctx.fill();
+            ctx.restore();
+          }
+
+          // Code
+          if (code) {
+            var codeBase = boxY + (boxH - codeH) / 2 + mC.asc;
+            drawText(ctx, s, code, codeFont, codeTextColor(s), boxX + (boxW - mC.w) / 2 + (mC.asc * shearAbs) / 2, codeBase, mC.asc);
+          }
+
+          // Label + small text
+          if (hasLeft) {
+            var top = (H - blockH) / 2;
+            var alignX = function (w) {
+              if (s.align === 'left') return textX;
+              if (s.align === 'right') return textX + leftW - w;
+              return textX + (leftW - w) / 2;
+            };
+            var labelBase = top + mL.asc;
+            if (label) drawText(ctx, s, label, labelFont, s.labelColor, alignX(mL.w) + (mL.asc * shearAbs) / 2, labelBase, mL.asc);
+            if (sub) {
+              var subBase = labelBase + mL.desc + lineGap + mS.asc;
+              drawText(ctx, s, sub, subFont, s.subColor, alignX(mS.w) + (mS.asc * shearAbs) / 2, subBase, mS.asc);
+            }
+          }
+
+          return { w: W, h: H };
+        }
+
+        /* ---------------------------------------------------------------
+         * Preview
+         * ------------------------------------------------------------- */
+        var previewCanvas = document.getElementById('preview');
+        var sizeNote = document.getElementById('size-note');
+        var exportScale = document.getElementById('export-scale');
+        var PREVIEW_ZOOM = 3;
+
+        function redraw() {
+          var ratio = Math.max(1, window.devicePixelRatio || 1);
+          var size = render(previewCanvas, PREVIEW_ZOOM * ratio);
+          previewCanvas.style.width = size.w * PREVIEW_ZOOM + 'px';
+          var k = Number(exportScale.value);
+          sizeNote.textContent = 'PNG: ' + Math.round(size.w * k) + ' x ' + Math.round(size.h * k) + ' px';
+        }
+
+        /* Fonts arrive asynchronously, and a canvas won't redraw itself when
+           they do, so ask for the two in use and draw again once they land. */
+        function ensureFonts() {
+          if (!document.fonts || !document.fonts.load) return;
+          Promise.all([
+            document.fonts.load(fontSpec(state.labelFont, 40), state.label + state.sub),
+            document.fonts.load(fontSpec(state.codeFont, 40), state.code),
+          ]).then(redraw, redraw);
+        }
+
+        var saveTimer = 0;
+        function changed() {
+          redraw();
+          ensureFonts();
+          syncVisibility();
+          markActivePreset();
+          clearTimeout(saveTimer);
+          saveTimer = setTimeout(function () { writeJSON(STATE_KEY, state); }, 200);
+        }
+
+        /* ---------------------------------------------------------------
+         * Controls
+         * ------------------------------------------------------------- */
+        var fontSelects = document.querySelectorAll('.font-select');
+        function fillFonts() {
+          fontSelects.forEach(function (sel) {
+            sel.innerHTML = '';
+            FONTS.forEach(function (f) {
+              var o = document.createElement('option');
+              o.value = f[0];
+              o.textContent = f[1];
+              sel.appendChild(o);
+            });
+          });
+        }
+        fillFonts();
+
+        // Colour pickers: a swatch and a hex box kept in step.
+        document.querySelectorAll('[data-color]').forEach(function (wrap) {
+          var key = wrap.getAttribute('data-color');
+          var picker = document.createElement('input');
+          picker.type = 'color';
+          picker.setAttribute('aria-label', key);
+          var hex = document.createElement('input');
+          hex.type = 'text';
+          hex.maxLength = 7;
+          hex.spellcheck = false;
+          wrap.appendChild(picker);
+          wrap.appendChild(hex);
+          picker.addEventListener('input', function () {
+            state[key] = picker.value;
+            hex.value = picker.value;
+            changed();
+          });
+          hex.addEventListener('input', function () {
+            var v = hex.value.trim();
+            if (v[0] !== '#') v = '#' + v;
+            if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v)) {
+              if (v.length === 4) v = '#' + v.slice(1).replace(/./g, '$&$&');
+              state[key] = v.toLowerCase();
+              picker.value = state[key];
+              changed();
+            }
+          });
+          hex.addEventListener('blur', function () { hex.value = state[key]; });
+          wrap._sync = function () { picker.value = state[key]; hex.value = state[key]; };
+        });
+
+        document.querySelectorAll('[data-key]').forEach(function (el) {
+          var key = el.getAttribute('data-key');
+          var evt = el.tagName === 'SELECT' || el.type === 'checkbox' ? 'change' : 'input';
+          el.addEventListener(evt, function () {
+            if (el.type === 'checkbox') state[key] = el.checked;
+            else if (el.type === 'range') state[key] = Number(el.value);
+            else state[key] = el.value;
+            changed();
+          });
+        });
+
+        document.querySelectorAll('[data-seg]').forEach(function (group) {
+          var key = group.getAttribute('data-seg');
+          group.addEventListener('click', function (e) {
+            var btn = e.target.closest('button');
+            if (!btn) return;
+            state[key] = btn.getAttribute('data-val');
+            syncControls();
+            changed();
+          });
+        });
+
+        var UNITS = { gradAngle: '°', slant: '°', bgOpacity: '%', boxOpacity: '%' };
+
+        function syncControls() {
+          document.querySelectorAll('[data-key]').forEach(function (el) {
+            var key = el.getAttribute('data-key');
+            if (el.type === 'checkbox') el.checked = !!state[key];
+            else if (document.activeElement !== el) el.value = state[key];
+          });
+          document.querySelectorAll('[data-color]').forEach(function (wrap) { wrap._sync(); });
+          document.querySelectorAll('[data-seg]').forEach(function (group) {
+            var key = group.getAttribute('data-seg');
+            group.querySelectorAll('button').forEach(function (b) {
+              b.classList.toggle('on', b.getAttribute('data-val') === state[key]);
+            });
+          });
+          syncOutputs();
+        }
+
+        function syncOutputs() {
+          document.querySelectorAll('[data-out]').forEach(function (out) {
+            var key = out.getAttribute('data-out');
+            out.textContent = state[key] + (UNITS[key] || 'px');
+          });
+        }
+
+        function syncVisibility() {
+          syncOutputs();
+          document.querySelectorAll('[data-show]').forEach(function (el) {
+            el.hidden = !state[el.getAttribute('data-show')];
+          });
+          document.querySelectorAll('[data-hide]').forEach(function (el) {
+            el.hidden = !!state[el.getAttribute('data-hide')];
+          });
+          document.querySelectorAll('[data-show-val]').forEach(function (el) {
+            var p = el.getAttribute('data-show-val').split('=');
+            el.hidden = state[p[0]] !== p[1];
+          });
+        }
+
+        /* ---------------------------------------------------------------
+         * Presets
+         * ------------------------------------------------------------- */
+        var presetBox = document.getElementById('presets');
+        var customBox = document.getElementById('custom-presets');
+        var customWrap = document.getElementById('custom-wrap');
+
+        function swatchCss(st) {
+          var box = st.boxGradient
+            ? 'linear-gradient(90deg, ' + st.boxColor1 + ', ' + st.boxColor2 + ')'
+            : st.boxSolid;
+          return 'background: ' + box + ';';
+        }
+
+        function sameStyle(st) {
+          return Object.keys(DEFAULT_STYLE).every(function (k) { return st[k] === state[k]; });
+        }
+
+        function applyStyle(st) {
+          Object.keys(DEFAULT_STYLE).forEach(function (k) {
+            if (k in st) state[k] = st[k];
+          });
+          ensureCustomFontOptions();
+          syncControls();
+          changed();
+        }
+
+        function tile(p, onDelete) {
+          var slot = document.createElement('div');
+          slot.className = 'preset-slot';
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'preset';
+          b._style = p.style;
+          var name = document.createElement('span');
+          name.className = 'preset-name';
+          name.textContent = p.name;
+          var sw = document.createElement('span');
+          sw.className = 'preset-swatch';
+          sw.setAttribute('style', swatchCss(p.style));
+          b.appendChild(name);
+          b.appendChild(sw);
+          if (p.blurb) {
+            var blurb = document.createElement('span');
+            blurb.className = 'preset-blurb';
+            blurb.textContent = p.blurb;
+            b.appendChild(blurb);
+          }
+          b.addEventListener('click', function () { applyStyle(p.style); });
+          slot.appendChild(b);
+          if (onDelete) {
+            var del = document.createElement('button');
+            del.type = 'button';
+            del.className = 'preset-delete';
+            del.textContent = '✕';
+            del.title = 'Delete "' + p.name + '"';
+            del.setAttribute('aria-label', del.title);
+            del.addEventListener('click', onDelete);
+            slot.appendChild(del);
+          }
+          return slot;
+        }
+
+        function renderPresets() {
+          presetBox.innerHTML = '';
+          PRESETS.forEach(function (p) { presetBox.appendChild(tile(p)); });
+          customBox.innerHTML = '';
+          customPresets.forEach(function (p, i) {
+            customBox.appendChild(tile(p, function () {
+              customPresets.splice(i, 1);
+              writeJSON(PRESETS_KEY, customPresets);
+              renderPresets();
+            }));
+          });
+          customWrap.hidden = customPresets.length === 0;
+          markActivePreset();
+        }
+
+        function markActivePreset() {
+          document.querySelectorAll('.preset').forEach(function (b) {
+            b.classList.toggle('on', !!b._style && sameStyle(b._style));
+          });
+        }
+
+        var presetName = document.getElementById('preset-name');
+        function savePreset() {
+          var name = presetName.value.trim() || 'My preset ' + (customPresets.length + 1);
+          var style = {};
+          Object.keys(DEFAULT_STYLE).forEach(function (k) { style[k] = state[k]; });
+          customPresets = customPresets.filter(function (p) { return p.name !== name; });
+          customPresets.push({ name: name, style: style });
+          writeJSON(PRESETS_KEY, customPresets);
+          presetName.value = '';
+          renderPresets();
+          flash('Saved "' + name + '"');
+        }
+        document.getElementById('preset-save').addEventListener('click', savePreset);
+        presetName.addEventListener('keydown', function (e) { if (e.key === 'Enter') savePreset(); });
+
+        /* ---------------------------------------------------------------
+         * Uploaded fonts. Kept for this page view only; if a saved state
+         * points at one after a reload it falls back to the default.
+         * ------------------------------------------------------------- */
+        var uploaded = 0;
+        document.getElementById('font-upload').addEventListener('change', function (e) {
+          var file = e.target.files && e.target.files[0];
+          if (!file || !window.FontFace) return;
+          file.arrayBuffer().then(function (buf) {
+            var family = 'Uploaded ' + (++uploaded) + ' ' + file.name.replace(/\.[^.]+$/, '').replace(/["|]/g, '');
+            var face = new FontFace(family, buf);
+            return face.load().then(function (loaded) {
+              document.fonts.add(loaded);
+              FONTS.unshift([family + '|400', family.replace(/^Uploaded \d+ /, '') + ' (uploaded)']);
+              fillFonts();
+              state.labelFont = family + '|400';
+              state.codeFont = family + '|400';
+              syncControls();
+              changed();
+              flash('Font loaded');
+            });
+          }).catch(function () {
+            flash("Couldn't read that font file", true);
+          });
+          e.target.value = '';
+        });
+
+        function ensureCustomFontOptions() {
+          var known = FONTS.map(function (f) { return f[0]; });
+          if (known.indexOf(state.labelFont) < 0) state.labelFont = DEFAULT_STYLE.labelFont;
+          if (known.indexOf(state.codeFont) < 0) state.codeFont = DEFAULT_STYLE.codeFont;
+        }
+
+        /* ---------------------------------------------------------------
+         * Export
+         * ------------------------------------------------------------- */
+        var statusEl = document.getElementById('status');
+        var flashTimer = 0;
+        function flash(msg, bad) {
+          statusEl.textContent = msg;
+          statusEl.style.color = bad ? 'var(--danger)' : '';
+          clearTimeout(flashTimer);
+          flashTimer = setTimeout(function () { statusEl.textContent = ''; }, 2500);
+        }
+
+        function exportBlob() {
+          var c = document.createElement('canvas');
+          render(c, Number(exportScale.value));
+          return new Promise(function (resolve) { c.toBlob(resolve, 'image/png'); });
+        }
+
+        function fileName() {
+          var slug = String(state.code).trim().replace(/[^a-z0-9_-]+/gi, '-').replace(/^-+|-+$/g, '');
+          return 'use-code-' + (slug || 'overlay') + '.png';
+        }
+
+        document.getElementById('download').addEventListener('click', function () {
+          exportBlob().then(function (blob) {
+            if (!blob) return flash('Export failed', true);
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = fileName();
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+            flash('Downloaded ' + fileName());
+          });
+        });
+
+        document.getElementById('copy').addEventListener('click', function () {
+          if (!navigator.clipboard || !window.ClipboardItem) {
+            return flash("Your browser can't copy images, use Download instead", true);
+          }
+          navigator.clipboard
+            .write([new ClipboardItem({ 'image/png': exportBlob() })])
+            .then(function () { flash('Copied to clipboard'); })
+            .catch(function () { flash("Couldn't copy, use Download instead", true); });
+        });
+
+        exportScale.addEventListener('change', redraw);
+
+        document.getElementById('reset').addEventListener('click', function () {
+          state = Object.assign({}, DEFAULT_STYLE, DEFAULT_TEXT);
+          syncControls();
+          changed();
+        });
+
+        /* ---------------------------------------------------------------
+         * Preview backdrop
+         * ------------------------------------------------------------- */
+        var stage = document.getElementById('stage');
+        var stageBg = document.getElementById('stage-bg');
+        stageBg.addEventListener('click', function (e) {
+          var btn = e.target.closest('button');
+          if (!btn) return;
+          var v = btn.getAttribute('data-val');
+          stage.className = 'stage' + (v === 'checker' ? '' : ' bg-' + v);
+          stageBg.querySelectorAll('button').forEach(function (b) { b.classList.toggle('on', b === btn); });
+        });
+
+        /* ---------------------------------------------------------------
+         * Theme toggle, same behaviour as SeedForge: system -> light -> dark
+         * ------------------------------------------------------------- */
+        (function initTheme() {
+          var ORDER = ['system', 'light', 'dark'];
+          var FACE = {
+            system: { icon: '◐', label: 'System' },
+            light: { icon: '☀', label: 'Light' },
+            dark: { icon: '☾', label: 'Dark' },
+          };
+          var button = document.getElementById('theme');
+          var icon = document.getElementById('theme-icon');
+          var label = document.getElementById('theme-label');
+          var current = 'system';
+          try {
+            var raw = localStorage.getItem(THEME_KEY);
+            if (raw === 'light' || raw === 'dark') current = raw;
+          } catch (e) { /* blocked */ }
+
+          function apply() {
+            var root = document.documentElement;
+            if (current === 'system') root.removeAttribute('data-theme');
+            else root.setAttribute('data-theme', current);
+            var face = FACE[current];
+            var next = ORDER[(ORDER.indexOf(current) + 1) % ORDER.length];
+            icon.textContent = face.icon;
+            label.textContent = face.label;
+            button.title = 'Theme: ' + face.label + '. Click for ' + FACE[next].label.toLowerCase() + '.';
+            button.setAttribute('aria-label', button.title);
+          }
+
+          apply();
+          button.addEventListener('click', function () {
+            current = ORDER[(ORDER.indexOf(current) + 1) % ORDER.length];
+            try {
+              if (current === 'system') localStorage.removeItem(THEME_KEY);
+              else localStorage.setItem(THEME_KEY, current);
+            } catch (e) { /* still works for this page view */ }
+            apply();
+          });
+        })();
+
+        /* --- boot --- */
+        ensureCustomFontOptions();
+        syncControls();
+        renderPresets();
+        changed();
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(redraw);
+        window.addEventListener('resize', redraw);
+      })();
+    </script>
+  </body>
+</html>
