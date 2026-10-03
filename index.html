@@ -4,6 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Code Overlay - by fwsoapy</title>
+    <link rel="icon" href="./logo.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
     <meta
       name="description"
       content="Make a custom 'Use Code' creator code overlay for your stream or videos and download it as a transparent PNG. Runs entirely in your browser."
@@ -133,7 +135,7 @@
       }
 
       .brand { display: flex; align-items: center; gap: 14px; }
-      .brand-mark { width: 56px; height: 56px; flex: none; display: block; image-rendering: pixelated; }
+      .brand-mark { width: 56px; height: 56px; flex: none; display: block; }
       .topbar h1 { font-size: 20px; margin: 0; letter-spacing: 0.2px; }
       .tagline { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
 
@@ -243,7 +245,25 @@
       .color-input input[type="text"] { font-family: var(--mono); font-size: 13px; text-transform: lowercase; }
 
       .range-head { display: flex; justify-content: space-between; gap: 8px; }
-      .range-val { font-family: var(--mono); font-size: 12px; color: var(--text); }
+      .range-val { display: inline-flex; align-items: center; gap: 2px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+      .range-num {
+        width: 54px;
+        padding: 3px 6px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--bg-input);
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 12px;
+        text-align: right;
+        -moz-appearance: textfield;
+        appearance: textfield;
+      }
+      .range-num::-webkit-inner-spin-button,
+      .range-num::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+      .range-num:hover { border-color: var(--line-hover); }
+      .range-num:focus { outline: 2px solid var(--accent-dark); outline-offset: 0; }
+      .range-head { align-items: center; }
       input[type="range"] {
         padding: 0;
         border: none;
@@ -466,20 +486,7 @@
   <body>
     <header class="topbar">
       <div class="brand">
-        <svg class="brand-mark" viewBox="0 0 14 14" aria-hidden="true" shape-rendering="crispEdges">
-          <defs>
-            <linearGradient id="mark-grad" x1="0" x2="1" y1="0" y2="0">
-              <stop offset="0" stop-color="#5ee7ff" />
-              <stop offset="1" stop-color="#3b6cff" />
-            </linearGradient>
-          </defs>
-          <rect x="1" y="4" width="12" height="6" fill="#26303d" />
-          <rect x="6" y="5" width="6" height="4" fill="url(#mark-grad)" />
-          <rect x="2" y="5" width="3" height="1" fill="#e6edf3" />
-          <rect x="2" y="7" width="3" height="1" fill="#e6edf3" />
-          <rect x="3" y="8" width="1" height="1" fill="#5ee7ff" />
-          <rect x="7" y="6" width="4" height="2" fill="#ffffff" />
-        </svg>
+<img class="brand-mark" src="./logo.svg" alt="" aria-hidden="true" width="56" height="56" />
         <div>
           <h1>Code Overlay</h1>
           <p class="tagline">Make a "Use Code" overlay and download it as a PNG.</p>
@@ -1112,10 +1119,54 @@
           syncOutputs();
         }
 
+        /* Each slider gets a number box next to it, for typing an exact value
+           instead of dragging. Typed values can go past the slider's end
+           (the slider just pins), except percentages and angles. */
+        document.querySelectorAll('[data-out]').forEach(function (out) {
+          var key = out.getAttribute('data-out');
+          var range = document.querySelector('input[type="range"][data-key="' + key + '"]');
+          var unit = UNITS[key] || 'px';
+          var min = Number(range.min);
+          var max = unit === 'px' ? Number(range.max) * 4 : Number(range.max);
+          var num = document.createElement('input');
+          num.type = 'number';
+          num.className = 'range-num';
+          num.min = String(min);
+          num.max = String(max);
+          num.step = range.step || '1';
+          num.inputMode = 'numeric';
+          num.setAttribute('aria-label', out.parentNode.firstElementChild.textContent);
+          var suffix = document.createElement('span');
+          suffix.textContent = unit;
+          out.textContent = '';
+          out.appendChild(num);
+          out.appendChild(suffix);
+          out._num = num;
+
+          function take(final) {
+            var v = parseFloat(num.value);
+            if (isNaN(v)) {
+              if (final) num.value = state[key];
+              return;
+            }
+            v = Math.min(max, Math.max(min, v));
+            if (final) num.value = v;
+            if (v === state[key]) return;
+            state[key] = v;
+            range.value = v;
+            changed();
+          }
+          num.addEventListener('input', function () { take(false); });
+          num.addEventListener('change', function () { take(true); });
+          num.addEventListener('blur', function () { take(true); });
+          num.addEventListener('focus', function () { num.select(); });
+          num.addEventListener('keydown', function (e) { if (e.key === 'Enter') num.blur(); });
+        });
+
         function syncOutputs() {
           document.querySelectorAll('[data-out]').forEach(function (out) {
             var key = out.getAttribute('data-out');
-            out.textContent = state[key] + (UNITS[key] || 'px');
+            if (document.activeElement !== out._num) out._num.value = state[key];
           });
         }
 
