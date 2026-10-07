@@ -11,8 +11,33 @@
       content="Make a custom 'Use Code' creator code overlay for your stream or videos and download it as a transparent PNG. Runs entirely in your browser."
     />
     <meta name="author" content="fwsoapy" />
-    <meta name="theme-color" content="#f4f6f9" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#10141a" media="(prefers-color-scheme: dark)" />
+    <!-- One blue for the browser bar and for the colored edge of link previews
+         (Discord reads the first theme-color it finds). -->
+    <meta name="theme-color" content="#4b9eff" />
+
+    <!-- How a link to this page looks when it's pasted into Discord, X, Slack
+         and the like: a big picture of the ice blue overlay. The image address
+         has to be absolute, or the preview won't find it. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Code Overlay" />
+    <meta property="og:title" content="Code Overlay - by fwsoapy" />
+    <meta
+      property="og:description"
+      content="Make a custom 'Use Code' creator code overlay for your stream or videos and download it as a transparent PNG. Runs entirely in your browser."
+    />
+    <meta property="og:url" content="https://fwsoapy.github.io/code-overlay/" />
+    <meta property="og:image" content="https://fwsoapy.github.io/code-overlay/og.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="The ice blue Code Overlay reading USE CODE FWSOAPY #AD" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Code Overlay - by fwsoapy" />
+    <meta
+      name="twitter:description"
+      content="Make a custom 'Use Code' creator code overlay for your stream or videos and download it as a transparent PNG."
+    />
+    <meta name="twitter:image" content="https://fwsoapy.github.io/code-overlay/og.png" />
 
     <script>
       /* Applies a stored theme before first paint so the other palette never
