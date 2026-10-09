@@ -625,6 +625,11 @@
               <span>Gradient end</span>
               <div class="color-input" data-color="boxColor2"></div>
             </div>
+            <div class="field" data-show="boxGradient">
+              <div class="range-head"><span>Gradient angle</span><span class="range-val" data-out="gradAngle"></span></div>
+              <input data-key="gradAngle" type="range" min="0" max="360" step="1" />
+              <span class="field-hint">135° runs from the top left to the bottom right. 90° is straight across.</span>
+            </div>
             <div class="field" data-hide="boxGradient">
               <span>Box colour</span>
               <div class="color-input" data-color="boxSolid"></div>
@@ -713,7 +718,7 @@
           boxColor1: '#5ee7ff',
           boxColor2: '#3b6cff',
           boxSolid: '#5ee7ff',
-          gradAngle: 90,
+          gradAngle: 135,              // top left to bottom right
           boxOpacity: 100,
           boxRadius: 0,
           codeTextMode: 'white',
@@ -784,6 +789,12 @@
         var state = Object.assign({}, DEFAULT_STYLE, DEFAULT_TEXT, readJSON(STATE_KEY, {}));
         var customPresets = readJSON(PRESETS_KEY, []);
         if (!Array.isArray(customPresets)) customPresets = [];
+        // Before the angle had a control it was always 90°, so a saved 90° is
+        // the old default rather than a choice: move it to the new one.
+        if (state.gradAngle === 90) state.gradAngle = DEFAULT_STYLE.gradAngle;
+        customPresets.forEach(function (p) {
+          if (p && p.style && p.style.gradAngle === 90) p.style.gradAngle = DEFAULT_STYLE.gradAngle;
+        });
 
         /* ---------------------------------------------------------------
          * Drawing. Everything goes through one canvas routine so the
@@ -1236,7 +1247,7 @@
 
         function swatchCss(st) {
           var box = st.boxGradient
-            ? 'linear-gradient(90deg, ' + st.boxColor1 + ', ' + st.boxColor2 + ')'
+            ? 'linear-gradient(' + (st.gradAngle == null ? 135 : st.gradAngle) + 'deg, ' + st.boxColor1 + ', ' + st.boxColor2 + ')'
             : st.boxSolid;
           return 'background: ' + box + ';';
         }
